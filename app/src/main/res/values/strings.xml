@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">TOODO</string>
+    <string name="widget_description">显示今日待办任务</string>
+</resources>
