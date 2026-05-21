@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -30,7 +34,9 @@ import com.example.toodo.domain.model.Task
 import com.example.toodo.ui.component.EmptyState
 import com.example.toodo.ui.component.TaskCard
 import com.example.toodo.ui.util.toChineseShort
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.YearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +54,16 @@ fun PlanScreen(
                 query = uiState.searchQuery,
                 onQueryChange = viewModel::onSearchQueryChange,
                 onClear = viewModel::clearSearch
+            )
+
+            // ── Month Calendar ─────────────────────────────────────────
+            MonthCalendar(
+                currentMonth = uiState.currentMonth,
+                taskCounts = uiState.monthTaskCounts,
+                selectedDate = uiState.selectedDate,
+                onDateSelected = viewModel::selectDate,
+                onNextMonth = viewModel::nextMonth,
+                onPreviousMonth = viewModel::previousMonth
             )
 
             // ── Date strip ────────────────────────────────────────────────
@@ -452,6 +468,156 @@ private fun LocalDate.toDisplayStringInline(): String {
         else -> {
             val formatter = java.time.format.DateTimeFormatter.ofPattern("M月d日", java.util.Locale.CHINESE)
             this.format(formatter)
+        }
+    }
+}
+
+// ─── Month Calendar ────────────────────────────────────────────────────────────
+
+private val CHINESE_DAY_HEADERS = listOf(
+    DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+    DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY
+)
+
+@Composable
+private fun MonthCalendar(
+    currentMonth: YearMonth,
+    taskCounts: Map<LocalDate, Int>,
+    selectedDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+    onNextMonth: () -> Unit,
+    onPreviousMonth: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        // ── Month header ──────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPreviousMonth) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = "上个月",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                text = "${currentMonth.year}年${currentMonth.month.value}月",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            IconButton(onClick = onNextMonth) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "下个月",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // ── Day-of-week headers ───────────────────────────────────────
+        Row(modifier = Modifier.fillMaxWidth()) {
+            for (dow in CHINESE_DAY_HEADERS) {
+                Text(
+                    text = dow.toChineseShort(),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // ── Calendar grid ─────────────────────────────────────────────
+        val firstOfMonth = currentMonth.atDay(1)
+        val lastOfMonth = currentMonth.atEndOfMonth()
+        val startDate = firstOfMonth.minusDays(
+            (firstOfMonth.dayOfWeek.value - DayOfWeek.MONDAY.value).toLong()
+        )
+        val endDate = lastOfMonth.plusDays(
+            (DayOfWeek.SUNDAY.value - lastOfMonth.dayOfWeek.value).toLong()
+        )
+        val totalDays = endDate.toEpochDay() - startDate.toEpochDay() + 1
+        val weeks = ((totalDays + 6) / 7).toInt()
+
+        val today = LocalDate.now()
+
+        for (week in 0 until weeks) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                for (dayOfWeek in 0..6) {
+                    val date = startDate.plusDays((week * 7 + dayOfWeek).toLong())
+                    CalendarCell(
+                        date = date,
+                        isCurrentMonth = date.month == currentMonth.month,
+                        taskCount = taskCounts[date] ?: 0,
+                        isSelected = date == selectedDate,
+                        isToday = date == today,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onDateSelected(date) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarCell(
+    date: LocalDate,
+    isCurrentMonth: Boolean,
+    taskCount: Int,
+    isSelected: Boolean,
+    isToday: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val containerColor = when {
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        else -> Color.Transparent
+    }
+
+    val textColor = when {
+        !isCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+        isSelected || isToday -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
+    Box(
+        modifier = modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor)
+            .clickable(enabled = isCurrentMonth, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = textColor,
+                textAlign = TextAlign.Center
+            )
+            if (taskCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = CircleShape
+                        )
+                )
+            }
         }
     }
 }

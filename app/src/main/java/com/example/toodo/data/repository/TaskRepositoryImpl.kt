@@ -27,6 +27,7 @@ class TaskRepositoryImpl @Inject constructor(
 
     override fun getTodayTasks(todayEpochDay: Long): Flow<List<Task>> {
         val todayDate = LocalDate.ofEpochDay(todayEpochDay)
+        val todayStartMillis = todayDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val todayEndMillis = todayDate.plusDays(1)
             .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
         val todayDayOfWeek = todayDate.dayOfWeek
@@ -35,20 +36,22 @@ class TaskRepositoryImpl @Inject constructor(
             taskDao.getOneTimeTodayTasks(todayEndMillis),
             taskDao.getDailyTasks(),
             taskDao.getRecurringTasks(),
-            completionRecordDao.getByDate(todayEpochDay)
-        ) { oneTimeEntities, dailyEntities, recurringEntities, todayCompletions ->
+            completionRecordDao.getByDate(todayEpochDay),
+            taskDao.getCompletedTodayTasks(todayStartMillis, todayEndMillis)
+        ) { oneTimeEntities, dailyEntities, recurringEntities, todayCompletions, completedTodayEntities ->
             val completedTaskIds = todayCompletions.map { it.taskId }.toSet()
 
             // Filter daily: exclude those already completed today
             val filteredDaily = dailyEntities.filter { it.id !in completedTaskIds }
 
-            // Filter recurring: not completed today AND day-of-week matches recurrence rule
+            // Filter recurring: exclude completed today AND match day-of-week
             val filteredRecurring = recurringEntities.filter { entity ->
                 if (entity.id in completedTaskIds) return@filter false
                 matchesToday(entity, todayDayOfWeek)
             }
 
-            val allEntities = oneTimeEntities + filteredDaily + filteredRecurring
+            // Merge: uncompleted today + completed today
+            val allEntities = oneTimeEntities + filteredDaily + filteredRecurring + completedTodayEntities
             allEntities.map { mapEntityToTask(it) }
         }
     }
@@ -136,6 +139,20 @@ class TaskRepositoryImpl @Inject constructor(
         taskDao.updateCompletedAt(taskId, null)
         val record = completionRecordDao.getByTaskAndDate(taskId, date)
         record?.let { completionRecordDao.delete(it) }
+    }
+
+    override suspend fun skipTodayTask(taskId: Long, date: Long) {
+        // Write CompletionRecord WITHOUT setting completedAt → hides from today view
+        // without counting as "completed" for streaks/stats
+        val now = java.time.Instant.now().toEpochMilli()
+        completionRecordDao.insert(
+            CompletionRecordEntity(
+                taskId = taskId,
+                date = date,
+                completedAt = now,
+                isFocusTask = false
+            )
+        )
     }
 
     override suspend fun updateFocusStatus(taskId: Long, isFocus: Boolean) {

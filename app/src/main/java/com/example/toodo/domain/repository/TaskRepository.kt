@@ -15,6 +15,7 @@ interface TaskRepository {
     suspend fun deleteTask(taskId: Long)
     suspend fun completeTask(taskId: Long, date: Long, isFocus: Boolean)
     suspend fun uncompleteTask(taskId: Long, date: Long)
+    suspend fun skipTodayTask(taskId: Long, date: Long)
     suspend fun updateFocusStatus(taskId: Long, isFocus: Boolean)
     suspend fun updateDueDate(taskId: Long, dueDate: Long?)
     suspend fun addSubTask(subTask: SubTask): Long

@@ -1,10 +1,5 @@
 package com.example.toodo.ui.screen.today
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -62,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,6 +66,7 @@ import com.example.toodo.ui.component.CompletionConfetti
 import com.example.toodo.ui.component.EmptyState
 import com.example.toodo.ui.component.StreakBanner
 import com.example.toodo.ui.component.TaskCard
+import com.example.toodo.ui.util.HapticUtil
 import com.example.toodo.ui.util.toFullDateString
 import java.time.LocalDate
 
@@ -82,10 +78,10 @@ fun TodayScreen(
 ) {
     val viewModel: TodayViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val showFocusLimit by viewModel.showFocusLimitReached.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showOverflowMenu by remember { mutableStateOf(false) }
-    var showCompletedSection by remember { mutableStateOf(true) }
 
     // Show snackbar when focus limit is reached
     LaunchedEffect(showFocusLimit) {
@@ -135,7 +131,10 @@ fun TodayScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onAddTask,
+                onClick = {
+                    HapticUtil.performLightHaptic(context)
+                    onAddTask()
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
@@ -193,7 +192,7 @@ fun TodayScreen(
                         ) { task ->
                             SwipeableTaskItem(
                                 task = task,
-                                onComplete = { viewModel.completeTask(task) },
+                                onComplete = { HapticUtil.performConfirmationHaptic(context); viewModel.completeTask(task) },
                                 onDefer = { viewModel.deferTask(task) },
                                 onClick = { viewModel.selectTask(task) }
                             )
@@ -214,54 +213,30 @@ fun TodayScreen(
                         ) { task ->
                             SwipeableTaskItem(
                                 task = task,
-                                onComplete = { viewModel.completeTask(task) },
+                                onComplete = { HapticUtil.performConfirmationHaptic(context); viewModel.completeTask(task) },
                                 onDefer = { viewModel.deferTask(task) },
                                 onClick = { viewModel.selectTask(task) }
                             )
                         }
                     }
 
-                    // ── Completed tasks section ──
+                    // ── Completed tasks section (always visible) ──
                     if (uiState.completedTasks.isNotEmpty()) {
                         item {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showCompletedSection = !showCompletedSection }
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "✓ 已完成 (${uiState.completedTasks.size})",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = if (showCompletedSection) "收起" else "展开",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            SectionHeader(
+                                title = "✓ 已完成",
+                                subtitle = "${uiState.completedTasks.size} 项"
+                            )
                         }
-
-                        item {
-                            AnimatedVisibility(
-                                visible = showCompletedSection,
-                                enter = expandVertically() + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    uiState.completedTasks.forEach { task ->
-                                        TaskCard(
-                                            task = task,
-                                            onClick = { viewModel.selectTask(task) },
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                            }
+                        items(
+                            items = uiState.completedTasks,
+                            key = { "completed_${it.id}" }
+                        ) { task ->
+                            TaskCard(
+                                task = task,
+                                onClick = { viewModel.selectTask(task) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
 
@@ -284,22 +259,27 @@ fun TodayScreen(
             task = selectedTask,
             onDismiss = { viewModel.dismissBottomSheet() },
             onCompleteToggle = {
+                HapticUtil.performConfirmationHaptic(context)
                 if (selectedTask.isCompleted) viewModel.uncompleteTask(selectedTask)
                 else viewModel.completeTask(selectedTask)
                 viewModel.dismissBottomSheet()
             },
             onDefer = {
+                HapticUtil.performLightHaptic(context)
                 viewModel.deferTask(selectedTask)
                 viewModel.dismissBottomSheet()
             },
             onEdit = {
+                HapticUtil.performLightHaptic(context)
                 viewModel.dismissBottomSheet()
                 onTaskClick(selectedTask.id)
             },
             onDelete = {
+                HapticUtil.performConfirmationHaptic(context)
                 viewModel.deleteTask(selectedTask)
             },
             onToggleFocus = {
+                HapticUtil.performConfirmationHaptic(context)
                 viewModel.toggleFocus(selectedTask)
                 viewModel.dismissBottomSheet()
             }
@@ -461,10 +441,10 @@ private fun TaskBottomSheet(
                 onClick = onCompleteToggle
             )
 
-            // Defer to tomorrow
+            // Defer / Skip today
             BottomSheetAction(
                 icon = Icons.Default.SkipNext,
-                label = "推迟到明天",
+                label = if (task.taskType == com.example.toodo.domain.model.TaskType.ONE_TIME) "推迟到明天" else "跳过今天",
                 onClick = onDefer
             )
 

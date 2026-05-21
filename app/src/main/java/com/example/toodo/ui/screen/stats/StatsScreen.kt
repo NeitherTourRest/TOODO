@@ -37,9 +37,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,12 +50,14 @@ import com.example.toodo.ui.component.BalanceChart
 import com.example.toodo.ui.component.HeatmapCalendar
 import com.example.toodo.ui.theme.StreakActive
 import com.example.toodo.ui.theme.StreakFrozen
+import com.example.toodo.ui.util.HapticUtil
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen() {
     val viewModel: StatsViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -94,7 +98,10 @@ fun StatsScreen() {
                     streakDays = uiState.streakDays,
                     longestStreak = uiState.longestStreak,
                     freezesRemaining = uiState.freezesRemaining,
-                    onUseFreeze = { viewModel.useFreeze() }
+                    onUseFreeze = {
+                        HapticUtil.performConfirmationHaptic(context)
+                        viewModel.useFreeze()
+                    }
                 )
 
                 // ── 2. Daily Completion Ring ──

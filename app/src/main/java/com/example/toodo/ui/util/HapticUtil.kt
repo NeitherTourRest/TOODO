@@ -9,10 +9,20 @@ import android.os.VibratorManager
 object HapticUtil {
 
     /**
-     * Triggers a short (50ms) confirmation haptic vibration.
-     * Handles the Vibrator API deprecation across API levels 24+.
+     * Strong confirmation haptic (50ms) — task completion, focus toggle, save.
      */
     fun performConfirmationHaptic(context: Context) {
+        vibrate(context, 50)
+    }
+
+    /**
+     * Light tap haptic (15ms) — button taps, navigation, minor interactions.
+     */
+    fun performLightHaptic(context: Context) {
+        vibrate(context, 15)
+    }
+
+    private fun vibrate(context: Context, durationMs: Long) {
         val vibrator: Vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
             manager.defaultVibrator
@@ -23,11 +33,11 @@ object HapticUtil {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(
-                VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
+                VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE)
             )
         } else {
             @Suppress("DEPRECATION")
-            vibrator.vibrate(50)
+            vibrator.vibrate(durationMs)
         }
     }
 }

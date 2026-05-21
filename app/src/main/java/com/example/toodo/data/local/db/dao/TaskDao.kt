@@ -56,6 +56,10 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE completedAt IS NULL AND isArchived = 0 AND taskType = 'ONE_TIME' AND dueDate IS NOT NULL")
     fun getIncompleteTasksWithReminders(): Flow<List<TaskEntity>>
 
+    // Tasks completed today (for showing in completed section)
+    @Query("SELECT * FROM tasks WHERE completedAt >= :todayStartMillis AND completedAt <= :todayEndMillis AND isArchived = 0 ORDER BY completedAt DESC")
+    fun getCompletedTodayTasks(todayStartMillis: Long, todayEndMillis: Long): Flow<List<TaskEntity>>
+
     // Update focus status
     @Query("UPDATE tasks SET isFocusTask = :isFocus WHERE id = :taskId")
     suspend fun updateFocusStatus(taskId: Long, isFocus: Boolean)

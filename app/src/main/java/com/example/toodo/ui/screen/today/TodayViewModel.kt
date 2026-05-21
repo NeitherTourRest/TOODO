@@ -3,11 +3,13 @@ package com.example.toodo.ui.screen.today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.toodo.domain.model.Task
+import com.example.toodo.domain.model.TaskType
 import com.example.toodo.domain.usecase.CompleteTaskUseCase
 import com.example.toodo.domain.usecase.DeleteTaskUseCase
 import com.example.toodo.domain.usecase.GetDailyStatsUseCase
 import com.example.toodo.domain.usecase.GetStreakUseCase
 import com.example.toodo.domain.usecase.GetTodayTasksUseCase
+import com.example.toodo.domain.usecase.SkipTodayTaskUseCase
 import com.example.toodo.domain.usecase.UncompleteTaskUseCase
 import com.example.toodo.domain.usecase.UpdateTaskUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,6 +29,7 @@ class TodayViewModel @Inject constructor(
     private val uncompleteTaskUseCase: UncompleteTaskUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val updateTaskUseCase: UpdateTaskUseCase,
+    private val skipTodayTaskUseCase: SkipTodayTaskUseCase,
     private val getStreakUseCase: GetStreakUseCase,
     private val getDailyStatsUseCase: GetDailyStatsUseCase
 ) : ViewModel() {
@@ -99,8 +102,17 @@ class TodayViewModel @Inject constructor(
 
     fun deferTask(task: Task) {
         viewModelScope.launch {
-            val tomorrow = LocalDate.now().plusDays(1)
-            updateTaskUseCase(task.copy(dueDate = tomorrow))
+            when (task.taskType) {
+                TaskType.ONE_TIME -> {
+                    // One-time: push due date to tomorrow
+                    val tomorrow = LocalDate.now().plusDays(1)
+                    updateTaskUseCase(task.copy(dueDate = tomorrow))
+                }
+                TaskType.DAILY, TaskType.RECURRING -> {
+                    // Daily/Recurring: skip today (write CompletionRecord, hide from today view)
+                    skipTodayTaskUseCase(task.id)
+                }
+            }
         }
     }
 
